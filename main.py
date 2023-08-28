@@ -210,7 +210,7 @@ def add_controlled_P_circuit(circ,op,qb):
      if (op == 'Z'):
          circ.cz(0,qb+1)
 
-def measure_expectation_hadamard_qasm(new_state, operator):
+def measure_expectation_hadamard_qasm(new_state, operator, im):
     '''
     Uses Hadamard test to compute expectation values
     '''
@@ -239,6 +239,8 @@ def measure_expectation_hadamard_qasm(new_state, operator):
 
 
     p.h(0)
+    if im:
+        p.sdg(0)
 
     p = p.compose(new_state, qubits = [i for i in range(1,Nq+1)])
 
@@ -270,7 +272,7 @@ def measure_expectation_hadamard_qasm(new_state, operator):
 
 
 
-def measure_expectation_hadamard(new_state, operator, Nq):
+def measure_expectation_hadamard(new_state, operator, Nq, im):
     '''
     Uses Hadamard test to compute expectation values
     '''
@@ -285,6 +287,8 @@ def measure_expectation_hadamard(new_state, operator, Nq):
 
 
     p.h(0)
+    if im:
+        p.sdg(0)
 
     p = p.compose(new_state, qubits = [i for i in range(1,Nq+1)])
 
@@ -392,7 +396,7 @@ def compute_smat(new_state, operator_list, Nq):
             operator = (op1[0]+op2[0],op1[1]+op2[1] )
 
             #op_sum, result_op = compute_expectation_operator(operator, new_state)
-            expectation_value = measure_expectation_hadamard(new_state,operator, Nq)
+            expectation_value = measure_expectation_hadamard(new_state,operator, Nq, False)
             smat[i,j] = expectation_value
             smat[j,i] = smat[i,j] 
 
@@ -416,9 +420,10 @@ def compute_bvec(new_state, operator_list, ham_term, Nq):
             #print(op1,op2)
             coeff = op2[1]
 
-            expectation_value = measure_expectation_hadamard(new_state,operator, Nq)
-            term -= coeff*expectation_value
+            expectation_value = measure_expectation_hadamard(new_state,operator, Nq, True)
+            term -= 2*coeff*expectation_value
 
+        #bvec[i] = 1j*term - 1j*np.conj(term)
         bvec[i] = term
 
         #result_noisy = result_noisy + result_op
@@ -579,14 +584,16 @@ if __name__=="__main__":
         #trans_state = transpile(new_state, backend, optimization_level=3, approximation_degree=0)
 
 
-        expectation_value = compute_expectation_fast(new_state, hamiltonian) #energy
-        norm = 1 - 2* dt*expectation_value
+
         for hterm in hamiltonian_list:
+
+            expectation_value = compute_expectation_fast(new_state, hamiltonian) #energy
+            norm = np.sqrt(1 - 2* dt*expectation_value)
 
             smat = compute_smat(new_state, operator_list, nq)
             Smat_ = smat + np.transpose(smat)
             bvec = compute_bvec(new_state, operator_list, [hterm], nq) 
-            bvec /=norm
+            bvec /= norm
 
             amat = get_minv(Smat_).dot(bvec)
 
